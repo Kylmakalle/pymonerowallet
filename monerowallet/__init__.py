@@ -104,7 +104,7 @@ class MoneroWallet(object):
         jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"getheight"}'
         return self.__sendrequest(jsoncontent)['height']
 
-    def transfer(self, destinations):
+    def transfer(self, destinations, do_not_relay=False):
         '''
             Send monero to a number of recipients.
 
@@ -117,9 +117,10 @@ class MoneroWallet(object):
         {'tx_hash': 'd4d0048c275e816ae1f6f55b4b04f7d508662679c044741db2aeb7cd63452059', 'tx_key': ''}
 
         '''
-        finalrequest = b'{"jsonrpc":"2.0","id":"0","method":"transfer","params":{"destinations":DESTLIST}}}'
+        finalrequest = b'{"jsonrpc":"2.0","id":"0","method":"transfer","params":{"destinations":DESTLIST, "do_not_relay":DONOTRELAY}}'
         dests = json.dumps(destinations)
         jsoncontent = finalrequest.replace(b'DESTLIST', dests.encode())
+        jsoncontent = jsoncontent.replace(b'DONOTRELAY', str(do_not_relay).encode())
         return self.__sendrequest(jsoncontent)
 
     def transfer_split(self, destinations):
