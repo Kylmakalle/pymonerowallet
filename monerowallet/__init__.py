@@ -235,6 +235,16 @@ class MoneroWallet(object):
         else:
             return result['payments']
 
+    def get_transfer_by_txid(self, txid):
+        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"get_transfers","params":{"txid":TXID}}'
+        jsoncontent = jsoncontent.replace(b'TXID', txid.encode())
+        return self.__sendrequest(jsoncontent)
+
+    def get_transfers(self, **kwargs):
+        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"get_transfers","params":PARAMS}'
+        jsoncontent = jsoncontent.replace(b'PARAMS', json.dumps(kwargs).encode())
+        return self.__sendrequest(jsoncontent)
+
     def incoming_transfers(self, transfer_type='all'):
         """
             Return a list of incoming transfers to the wallet.
