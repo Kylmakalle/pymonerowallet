@@ -239,7 +239,7 @@ class MoneroWallet(object):
     def get_transfer_by_txid(self, txid):
         jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"get_transfer_by_txid","params":{"txid":"TXID"}}'
         jsoncontent = jsoncontent.replace(b'TXID', txid.encode())
-        return self.__sendrequest(jsoncontent)
+        return self.__sendrequest(jsoncontent)['transfer']
 
     def get_transfers(self, **kwargs):
         jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"get_transfers","params":PARAMS}'
