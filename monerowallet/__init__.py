@@ -339,6 +339,19 @@ class MoneroWallet(object):
         jsoncontent = jsoncontent.replace(b'INTEGRATEDADDRESS', integrated_address.encode())
         return self.__sendrequest(jsoncontent)
 
+    def create_wallet(self, filename, password, language='English'):
+        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"create_wallet","params":{"filename":"FILENAME","password":"PASSWORD","language":"LANGUAGE"}}'
+        jsoncontent = jsoncontent.replace(b'FILENAME', filename.encode())
+        jsoncontent = jsoncontent.replace(b'PASSWORD', password.encode())
+        jsoncontent = jsoncontent.replace(b'LANGUAGE', language.encode())
+        return self.__sendrequest(jsoncontent)
+
+    def open_wallet(self, filename, password):
+        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"open_wallet","params":{"filename":"FILENAME","password":"PASSWORD"}}'
+        jsoncontent = jsoncontent.replace(b'FILENAME', filename.encode())
+        jsoncontent = jsoncontent.replace(b'PASSWORD', password.encode())
+        return self.__sendrequest(jsoncontent)
+
     def stop_wallet(self):
         '''
             Stops the wallet, storing the current state.
