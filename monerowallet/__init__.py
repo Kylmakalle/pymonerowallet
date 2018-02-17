@@ -16,7 +16,10 @@
 
 """
 # standard library imports
-import json
+try:
+    import ujson as json
+except ImportError:
+    import json
 
 # 3rd party library imports
 import requests
@@ -54,7 +57,11 @@ class MoneroWallet(object):
     def __init__(self, protocol='http', host='127.0.0.1', port=18082, path='/json_rpc'):
         self.server = {'protocol': protocol, 'host': host, 'port': port, 'path': path}
 
-    def getbalance(self):
+    def ping(self, method='', params={}):
+        jsoncontent = params
+        return self.__sendrequest(jsoncontent)
+
+    def getbalance(self, account=None):
         '''
             Return the wallet's balance.
 
@@ -68,10 +75,10 @@ class MoneroWallet(object):
 
         '''
         # prepare json content
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"getbalance"}'
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "getbalance", "params": {"account_index": account}}
         return self.__sendrequest(jsoncontent)
 
-    def getaddress(self):
+    def getaddress(self, account=None):
         '''
             Return the wallet's address.
 
@@ -85,8 +92,8 @@ class MoneroWallet(object):
 
         '''
         # prepare json content
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"getaddress"}'
-        return self.__sendrequest(jsoncontent)['address']
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "getaddress", "params": {'account_index': account}}
+        return self.__sendrequest(jsoncontent)  # ['address']
 
     def getheight(self):
         '''
@@ -102,10 +109,11 @@ class MoneroWallet(object):
 
         '''
         # prepare json content
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"getheight"}'
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "getheight"}
         return self.__sendrequest(jsoncontent)['height']
 
-    def transfer(self, destinations, do_not_relay=False):
+    def transfer(self, destinations, account=None, do_not_relay=False, get_tx_hex=True, priority=2, unlock_time=0,
+                 ringsize=5):
         '''
             Send monero to a number of recipients.
 
@@ -118,10 +126,13 @@ class MoneroWallet(object):
         {'tx_hash': 'd4d0048c275e816ae1f6f55b4b04f7d508662679c044741db2aeb7cd63452059', 'tx_key': ''}
 
         '''
-        finalrequest = b'{"jsonrpc":"2.0","id":"0","method":"transfer","params":{"destinations":DESTLIST, "do_not_relay":DONOTRELAY}}'
-        dests = json.dumps(destinations)
-        jsoncontent = finalrequest.replace(b'DESTLIST', dests.encode())
-        jsoncontent = jsoncontent.replace(b'DONOTRELAY', str(do_not_relay).encode())
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "transfer",
+                       "params": {"account_index": account, "destinations": destinations, "do_not_relay": do_not_relay,
+                                  "get_tx_hex": get_tx_hex,  # 'mixin': ringsize - 1,
+                                  # 'priority': priority,
+                                  # 'unlock_time': unlock_time,
+                                  # 'get_tx_keys': True,
+                                  'new_algorithm': True}}
         return self.__sendrequest(jsoncontent)
 
     def transfer_split(self, destinations):
@@ -138,12 +149,11 @@ class MoneroWallet(object):
         ['653a5da2dd541ab4b3d9811f84255bb243dd7338c1218c5e75036725b6ca123e']
 
         '''
-        finalrequest = b'{"jsonrpc":"2.0","id":"0","method":"transfer_split","params":{"destinations":DESTLIST}}}'
-        dests = json.dumps(destinations)
-        jsoncontent = finalrequest.replace(b'DESTLIST', dests.encode())
+        finalrequest = {"jsonrpc": "2.0", "id": "0", "method": "transfer_split",
+                        "params": {"destinations": destinations}}
         return self.__sendrequest(jsoncontent)['tx_hash_list']
 
-    def sweep_dust(self):
+    def sweep_dust(self, account=None):
         '''
             Send all dust outputs back to the wallet's, to make them easier to spend (and mix).
 
@@ -157,12 +167,21 @@ class MoneroWallet(object):
 
         '''
         # prepare json content
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"sweep_dust"}'
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "sweep_dust", "params": {"account_index": account}}
         result = self.__sendrequest(jsoncontent)
         if type(result) is type({}) and not result:
             return []
         else:
-            return result['tx_hash_list']
+            try:
+                return result['tx_hash_list']
+            except:
+                return result['multisig_txset']
+
+    def sweep_all(self, address, account=None, do_not_relay=False, below_amount=0):
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "sweep_all",
+                       "params": {"address": address, "do_not_relay": do_not_relay, "account_index": account,
+                                  "mixin": 4, "priority": 1, "below_amount": below_amount}}
+        return self.__sendrequest(jsoncontent)
 
     def store(self):
         '''
@@ -178,7 +197,7 @@ class MoneroWallet(object):
 
         '''
         # prepare json content
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"store"}'
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "store"}
         return self.__sendrequest(jsoncontent)
 
     def get_payments(self, payment_id):
@@ -198,8 +217,7 @@ class MoneroWallet(object):
 
         '''
         # prepare json content
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"get_payments","params":{"payment_id":"PAYMENTID"}}'
-        jsoncontent = jsoncontent.replace(b'PAYMENTID', payment_id.encode())
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "get_payments", "params": {"payment_id": payment_id}}
         result = self.__sendrequest(jsoncontent)
         if type(result) is type({}) and not result:
             return []
@@ -225,28 +243,24 @@ class MoneroWallet(object):
 
         '''
         # prepare json content
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"get_bulk_payments","params":{"payment_ids":[PAYMENTIDS],"min_block_height":HEIGHT}}'
-        payments_list = ['"{}"'.format(i) for i in payment_ids]
-        payments_to_str = ','.join(payments_list)
-        jsoncontent = jsoncontent.replace(b'PAYMENTIDS', payments_to_str.encode())
-        jsoncontent = jsoncontent.replace(b'HEIGHT', str(min_block_height).encode())
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "get_bulk_payments",
+                       "params": {"payment_ids": payment_ids, "min_block_height": min_block_height}}
         result = self.__sendrequest(jsoncontent)
         if type(result) is type({}) and not result:
             return []
         else:
             return result['payments']
 
-    def get_transfer_by_txid(self, txid):
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"get_transfer_by_txid","params":{"txid":"TXID"}}'
-        jsoncontent = jsoncontent.replace(b'TXID', txid.encode())
+    def get_transfer_by_txid(self, txid, account=None):
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "get_transfer_by_txid",
+                       "params": {"txid": txid, "account_index": account}}
         return self.__sendrequest(jsoncontent)['transfer']
 
     def get_transfers(self, **kwargs):
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"get_transfers","params":PARAMS}'
-        jsoncontent = jsoncontent.replace(b'PARAMS', json.dumps(kwargs).encode())
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "get_transfers", "params": kwargs}
         return self.__sendrequest(jsoncontent)
 
-    def incoming_transfers(self, transfer_type='all'):
+    def incoming_transfers(self, transfer_type='all', account=None):
         """
             Return a list of incoming transfers to the wallet.
 
@@ -273,8 +287,8 @@ class MoneroWallet(object):
 
         """
         # prepare json content
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"incoming_transfers","params":{"transfer_type":"TYPE"}}'
-        jsoncontent = jsoncontent.replace(b'TYPE', transfer_type.encode())
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "incoming_transfers",
+                       "params": {"transfer_type": transfer_type, "account_index": account}}
         return self.__sendrequest(jsoncontent)['transfers']
 
     def query_key(self, key_type='mnemonic'):
@@ -294,8 +308,7 @@ class MoneroWallet(object):
         '49c087c10112eea3554d85bc9813c57f8bbd1cac1f3abb3b70d12cbea712c908'
 
         '''
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"query_key","params":{"key_type":"KEYTYPE"}}'
-        jsoncontent = jsoncontent.replace(b'KEYTYPE', key_type.encode())
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "query_key", "params": {"key_type": key_type}}
         return self.__sendrequest(jsoncontent)['key']
 
     def make_integrated_address(self, payment_id=''):
@@ -314,10 +327,8 @@ class MoneroWallet(object):
 
         '''
         if not payment_id:
-            jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"make_integrated_address","params":{"payment_id":""}}'
-        else:
-            jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"make_integrated_address","params":{"payment_id":"PAYMENTID"}}'
-            jsoncontent = jsoncontent.replace(b'PAYMENTID', payment_id.encode())
+            jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "make_integrated_address",
+                           "params": {"payment_id": payment_id}}
         return self.__sendrequest(jsoncontent)
 
     def split_integrated_address(self, integrated_address):
@@ -335,21 +346,31 @@ class MoneroWallet(object):
             {'standard_address': '12GLv8KzVhxehv712FWPTF7CSWuVjuBarFd17QP163uxMaFyoqwmDf1aiRtS5jWgCkRsk12ycdBNJa6V4La8joznK4GAhcq', 'payment_id': '1acca0543e3082fa'}
 
         '''
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"split_integrated_address","params":{"integrated_address":"INTEGRATEDADDRESS"}}'
-        jsoncontent = jsoncontent.replace(b'INTEGRATEDADDRESS', integrated_address.encode())
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "split_integrated_address",
+                       "params": {"integrated_address": integrated_address}}
         return self.__sendrequest(jsoncontent)
 
     def create_wallet(self, filename, password, language='English'):
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"create_wallet","params":{"filename":"FILENAME","password":"PASSWORD","language":"LANGUAGE"}}'
-        jsoncontent = jsoncontent.replace(b'FILENAME', filename.encode())
-        jsoncontent = jsoncontent.replace(b'PASSWORD', password.encode())
-        jsoncontent = jsoncontent.replace(b'LANGUAGE', language.encode())
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "create_wallet",
+                       "params": {"filename": filename, "password": password, "language": language}}
         return self.__sendrequest(jsoncontent)
 
     def open_wallet(self, filename, password):
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"open_wallet","params":{"filename":"FILENAME","password":"PASSWORD"}}'
-        jsoncontent = jsoncontent.replace(b'FILENAME', filename.encode())
-        jsoncontent = jsoncontent.replace(b'PASSWORD', password.encode())
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "open_wallet",
+                       "params": {"filename": filename, "password": password}}
+        return self.__sendrequest(jsoncontent)
+
+    def get_accounts(self):
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "get_accounts", "params": {}}
+        return self.__sendrequest(jsoncontent)
+
+    def create_account(self, label=None):
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "create_account", "params": {"label": label}}
+        return self.__sendrequest(jsoncontent)
+
+    def create_address(self, account=None, label=None):
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "create_account",
+                       "params": {"account_index": account, "label": label}}
         return self.__sendrequest(jsoncontent)
 
     def stop_wallet(self):
@@ -365,7 +386,7 @@ class MoneroWallet(object):
         {}
 
         '''
-        jsoncontent = b'{"jsonrpc":"2.0","id":"0","method":"stop_wallet"}'
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "stop_wallet"}
         return self.__sendrequest(jsoncontent)
 
     def __sendrequest(self, jsoncontent):
@@ -377,7 +398,7 @@ class MoneroWallet(object):
                                                                       port=self.server['port'],
                                                                       path=self.server['path']),
                             headers=self.headers,
-                            data=jsoncontent)
+                            data=json.dumps(jsoncontent))
         result = req.json()
         # manage returned http status code
         if req.status_code != 200:
@@ -389,4 +410,7 @@ class MoneroWallet(object):
             else:
                 raise Error('Error: {}'.format(str(result)))
         # otherwise return result
-        return result['result']
+        try:
+            return result['result']
+        except:
+            return result
