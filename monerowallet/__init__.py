@@ -369,7 +369,7 @@ class MoneroWallet(object):
         return self.__sendrequest(jsoncontent)
 
     def create_address(self, account=None, label=None):
-        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "create_account",
+        jsoncontent = {"jsonrpc": "2.0", "id": "0", "method": "create_address",
                        "params": {"account_index": account, "label": label}}
         return self.__sendrequest(jsoncontent)
 
