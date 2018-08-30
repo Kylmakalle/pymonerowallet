@@ -113,7 +113,7 @@ class MoneroWallet(object):
         return self.__sendrequest(jsoncontent)['height']
 
     def transfer(self, destinations, account=None, do_not_relay=False, get_tx_hex=True, priority=2, unlock_time=0,
-                 ringsize=5):
+                 ringsize=7):
         '''
             Send monero to a number of recipients.
 
